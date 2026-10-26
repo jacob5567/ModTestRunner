@@ -1,0 +1,85 @@
+<Project>
+
+  <!--
+    Builds one mod's in-game tests: every .cs file under <mod repo>/tests/, compiled into <ModName>.Tests.dll, a plugin
+    that registers with ModTestRunner. The mod's repo holds only those sources; this build keeps its obj/ and bin/ in
+    ModTestRunner's own, under obj/tests/<ModName>/ and bin/tests/<ModName>/.
+
+    Run it with build-tests.sh, or: dotnet build build/ModTests.csproj -c Release -p:ModDir=<absolute path to the mod repo>
+    ModName defaults to the repo folder's name, and must match the mod's <ModName>.csproj.
+  -->
+  <PropertyGroup>
+    <!-- ModDir is usually a command-line property, which the project can't change, so the cleaned-up path gets its own. -->
+    <ModRoot Condition="'$(ModDir)' != ''">$([MSBuild]::NormalizeDirectory('$(ModDir)'))</ModRoot>
+    <ModName Condition="'$(ModName)' == '' And '$(ModRoot)' != ''">$([System.IO.Path]::GetFileName($([System.IO.Path]::GetDirectoryName('$(ModRoot)'))))</ModName>
+    <!-- Set before the SDK is imported, since it reads them. -->
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory)../obj/tests/$(ModName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>$(MSBuildThisFileDirectory)../bin/tests/$(ModName)/</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <!-- The mod's [assembly: InternalsVisibleTo("<ModName>.Tests")] names this assembly. -->
+    <AssemblyName>$(ModName).Tests</AssemblyName>
+    <RootNamespace>$(ModName).Tests</RootNamespace>
+    <Version>0.0.1</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <!-- Lets the publicized RoR2 reference be used at runtime (IgnoresAccessChecksTo). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>portable</DebugType>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <RestoreAdditionalProjectSources>https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
+    <!-- Only the mod's test sources are compiled, not anything near this file. -->
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <RiskOfOptionsDll Condition="'$(RiskOfOptionsDll)' == ''">$(ProfileDir)/BepInEx/plugins/Rune580-Risk_Of_Options/RiskOfOptions/RiskOfOptions.dll</RiskOfOptionsDll>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(ModRoot)tests/**/*.cs" Exclude="$(ModRoot)tests/bin/**;$(ModRoot)tests/obj/**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Core" Version="5.4.21" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="RoR2" HintPath="$(RoR2ManagedDir)/RoR2.dll" Publicize="true" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/UnityEngine*.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/Unity.TextMeshPro.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/Unity.Addressables.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/Unity.ResourceManager.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/com.unity.multiplayer-hlapi.Runtime.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/HGCSharpUtils.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/HGUnityUtils.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/KinematicCharacterController.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/AsyncManagement.dll" Private="false" />
+    <!-- For mods with a Risk Of Options settings page, whose types the tests may see through the mod's. -->
+    <Reference Include="RiskOfOptions" HintPath="$(RiskOfOptionsDll)" Private="false" Condition="Exists('$(RiskOfOptionsDll)')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The mod and the runner are plugins of their own, which their builds copy into the profile, so not copied here. -->
+    <ProjectReference Include="$(ModRoot)$(ModName).csproj" Private="false" />
+    <ProjectReference Include="../ModTestRunner.csproj" Private="false" />
+  </ItemGroup>
+
+  <Target Name="CheckModDir" BeforeTargets="CollectPackageReferences;CoreCompile">
+    <Error Condition="'$(ModDir)' == ''" Text="Set ModDir to the mod's repo: build-tests.sh &lt;mod repo&gt;, or -p:ModDir=&lt;path&gt;." />
+    <Error Condition="!Exists('$(ModRoot)$(ModName).csproj')" Text="$(ModRoot) has no $(ModName).csproj. Set ModName if the folder is named differently." />
+    <Error Condition="!Exists('$(ModRoot)tests')" Text="$(ModRoot) has no tests/ folder." />
+  </Target>
+
+  <!-- Drop the built plugin straight into the r2modman profile for quick testing. -->
+  <Target Name="CopyToProfile" AfterTargets="Build" Condition="'$(CopyToProfile)' == 'true' And Exists('$(ProfileDir)/BepInEx/plugins')">
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ProfileDir)/BepInEx/plugins/$(ModName).Tests" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied $(TargetFileName) to $(ProfileDir)/BepInEx/plugins/$(ModName).Tests" />
+  </Target>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+</Project>

@@ -30,11 +30,13 @@ Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary l
 
 ## Writing tests for a mod
 
-For a complete example, see [KarmaWarnings' tests](https://github.com/jacob5567/KarmaWarnings/tree/main/tests). They
-live in the mod's own repo, under `tests/`, as a project of their own.
+For a complete example, see [KarmaWarnings' tests](https://github.com/jacob5567/KarmaWarnings/tree/main/tests).
 
-1. Make a test plugin project that references the mod, `ModTestRunner.dll` and the game assemblies. To test the
-   mod's internals, add `[assembly: InternalsVisibleTo("<YourMod>.Tests")]` to the mod.
+1. Put the tests in a `tests/` folder in the mod's repo. It holds only `.cs` files: no project file, and no build
+   output. ModTestRunner builds them (see [Building a mod's tests](#building-a-mods-tests)). To test the mod's
+   internals, add `[assembly: InternalsVisibleTo("<YourMod>.Tests")]` to the mod. If the mod's project is at the repo
+   root, also exclude the tests from it, so they don't end up in the mod's DLL:
+   `<DefaultItemExcludes>$(DefaultItemExcludes);tests/**</DefaultItemExcludes>`.
 2. Subclass `ModTests` and register it in the plugin's `Awake`:
 
 ```csharp
@@ -116,8 +118,23 @@ After every scenario, the runner destroys what `Spawned`, `SpawnPrefab` and `Spa
 Needs the .NET 8 SDK. `dotnet build -c Release` builds the plugin and copies it into the r2modman profile set in
 `Directory.Build.props` (`-p:CopyToProfile=false` turns the copy off).
 
-A mod's test project can reference this one with a `ProjectReference` to a clone next to the mod's repo, as
-KarmaWarnings does, or reference the built `ModTestRunner.dll`.
+### Building a mod's tests
+
+```bash
+./build-tests.sh <mod repo>        # for example ./build-tests.sh ../KarmaWarnings
+```
+
+This compiles every `.cs` file under `<mod repo>/tests/` into `<ModName>.Tests.dll`, using
+[build/ModTests.csproj](build/ModTests.csproj). The build output stays in this repo, under
+`obj/tests/<ModName>/` and `bin/tests/<ModName>/`. The build also builds the mod and the runner, and copies all three
+into the profile. Arguments after the repo go to `dotnet build`, for example `-p:CopyToProfile=false`.
+
+- `<ModName>` is the repo folder's name, and the repo must have a `<ModName>.csproj` at its root. If the folder is
+  named differently, pass `-p:ModName=<name>`.
+- The tests are compiled against the game assemblies, BepInEx, the mod and the runner, and against Risk Of Options
+  when the profile has it.
+- With no project file in `tests/`, an editor that opens the mod's repo doesn't analyze those files, so compile
+  errors only show up when you build.
 
 ## License
 
