@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Dev-only: runs the in-game tests that mods' test plugins register. Never packaged or published. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>ModTestRunner</AssemblyName>
+    <RootNamespace>ModTestRunner</RootNamespace>
+    <Version>0.0.1</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <!-- Lets the publicized RoR2 reference be used at runtime (IgnoresAccessChecksTo). -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DebugType>portable</DebugType>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <RestoreAdditionalProjectSources>https://nuget.bepinex.dev/v3/index.json</RestoreAdditionalProjectSources>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BepInEx.Core" Version="5.4.21" PrivateAssets="all" />
+    <PackageReference Include="BepInEx.AssemblyPublicizer.MSBuild" Version="0.4.2" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="RoR2" HintPath="$(RoR2ManagedDir)/RoR2.dll" Publicize="true" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/UnityEngine*.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/Unity.Addressables.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/Unity.ResourceManager.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/com.unity.multiplayer-hlapi.Runtime.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/HGCSharpUtils.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/HGUnityUtils.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/KinematicCharacterController.dll" Private="false" />
+    <Reference Include="$(RoR2ManagedDir)/AsyncManagement.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- Drop the built plugin straight into the r2modman profile for quick testing. -->
+  <Target Name="CopyToProfile" AfterTargets="Build" Condition="'$(CopyToProfile)' == 'true' And Exists('$(ProfileDir)/BepInEx/plugins')">
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)$(TargetName).pdb" DestinationFolder="$(ProfileDir)/BepInEx/plugins/ModTestRunner" SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Copied $(TargetFileName) to $(ProfileDir)/BepInEx/plugins/ModTestRunner" />
+  </Target>
+
+</Project>

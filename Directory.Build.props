@@ -1,0 +1,14 @@
+<Project>
+  <!--
+    Paths to the game install and the r2modman profile the build output is copied into.
+    Override on the command line (dotnet build -p:RoR2Dir=...) or in a Directory.Build.props.user file.
+  -->
+  <Import Project="Directory.Build.props.user" Condition="Exists('Directory.Build.props.user')" />
+
+  <PropertyGroup>
+    <RoR2Dir Condition="'$(RoR2Dir)' == ''">$(HOME)/.local/share/Steam/steamapps/common/Risk of Rain 2</RoR2Dir>
+    <RoR2ManagedDir>$(RoR2Dir)/Risk of Rain 2_Data/Managed</RoR2ManagedDir>
+    <ProfileDir Condition="'$(ProfileDir)' == ''">$(HOME)/.config/r2modmanPlus-local/RiskOfRain2/profiles/Default</ProfileDir>
+    <CopyToProfile Condition="'$(CopyToProfile)' == ''">true</CopyToProfile>
+  </PropertyGroup>
+</Project>
