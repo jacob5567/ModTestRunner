@@ -1,11 +1,15 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using Path = System.IO.Path;
 using System.Linq;
+using BepInEx;
 using BepInEx.Bootstrap;
 using BepInEx.Configuration;
 using RoR2;
 using RoR2.CameraModes;
+using RoR2.UI;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Networking;
@@ -37,6 +41,12 @@ namespace ModTestRunner
         private const float MaxRadius = 3f;
         private const float GroundSearchAbove = 15f;
         private const float GroundSearchBelow = 40f;
+
+        // Screenshots go in BepInEx/ModTestRunner/Screenshots/<when the run started>/.
+        private const string ScreenshotFolderName = "Screenshots";
+        private readonly string screenshotFolder = Path.Combine(Paths.BepInExRootPath, nameof(ModTestRunner), ScreenshotFolderName,
+            DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
+        private int screenshotCount;
 
         // Where the last StandBefore put the player, for failure messages.
         private string lastStand = "never stood anywhere";
@@ -145,6 +155,10 @@ namespace ModTestRunner
 
                 string summary = $"Mod tests: {passed} passed, {failed} failed, {skipped} skipped.";
                 ModTestRunnerPlugin.Log.LogInfo(summary);
+                if (screenshotCount > 0)
+                {
+                    ModTestRunnerPlugin.Log.LogInfo($"Saved {screenshotCount} screenshots in {screenshotFolder}");
+                }
                 foreach (string failure in failures)
                 {
                     ModTestRunnerPlugin.Log.LogError("  " + failure);
@@ -716,6 +730,57 @@ namespace ModTestRunner
         public void SetHealthFraction(CharacterBody body, float fraction)
         {
             body.healthComponent.Networkhealth = body.healthComponent.fullHealth * fraction;
+        }
+
+        // ---- Screenshots ----
+
+        // Saves the screen as it is drawn this frame, as a PNG named after the scenario and the label, in this run's
+        // screenshot folder. The console is hidden for that frame, since it is usually open from starting the run. Not a
+        // check: give the game time to show what the screenshot is of first.
+        public IEnumerator Screenshot(string label = null)
+        {
+            List<Canvas> hidden = new List<Canvas>();
+            if (ConsoleWindow.instance)
+            {
+                foreach (Canvas canvas in ConsoleWindow.instance.transform.root.GetComponentsInChildren<Canvas>())
+                {
+                    if (!canvas.enabled) continue;
+                    canvas.enabled = false;
+                    hidden.Add(canvas);
+                }
+            }
+
+            // The frame is captured once it is drawn, so the console is already hidden in it.
+            yield return new WaitForEndOfFrame();
+            Texture2D shot = ScreenCapture.CaptureScreenshotAsTexture();
+            try
+            {
+                Directory.CreateDirectory(screenshotFolder);
+                string name = scenario != null ? scenario.FullName : "screenshot";
+                if (!string.IsNullOrEmpty(label))
+                {
+                    name += "." + label;
+                }
+                foreach (char invalid in Path.GetInvalidFileNameChars())
+                {
+                    name = name.Replace(invalid, '_');
+                }
+                string path = Path.Combine(screenshotFolder, name + ".png");
+                File.WriteAllBytes(path, shot.EncodeToPNG());
+                screenshotCount++;
+                ModTestRunnerPlugin.Log.LogInfo($"Screenshot: {path}");
+            }
+            finally
+            {
+                UnityEngine.Object.Destroy(shot);
+                foreach (Canvas canvas in hidden)
+                {
+                    if (canvas)
+                    {
+                        canvas.enabled = true;
+                    }
+                }
+            }
         }
 
         // ---- Explaining failures ----

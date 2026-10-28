@@ -24,6 +24,9 @@ Start a run, then open the console (Ctrl+Alt+`) and use `mod_test`:
 | `mod_test list [flags]` | Lists what the same flags would run, without running it. |
 | `mod_test help` | Shows these forms and the registered mods. |
 
+Suites that take screenshots, or are otherwise slow, can be marked to run only when named with `--suite`; `mod_test list`
+names them. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
+
 `--mod` and `--suite` can each be given more than once. Names aren't case-sensitive.
 
 Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures.
@@ -110,6 +113,7 @@ triggers a scenario needs unearned.
 | Commands and spawning | `Cmd` (with `Commands.*`), `Spawned<T>`, `SpawnPrefab<T>`, `SpawnPickup`, `ItemOfTier`, `FindBody` |
 | Moving and aiming | `StandBefore`, `StandNear`, `Teleport`, `AimAt`, `AimAway`, `Interact` |
 | State | `Body`, `LocalBody`, `SetHealthFraction`, `GoTo` (another stage mid-scenario) |
+| Screenshots | `Screenshot(label)`: saves the screen as `BepInEx/ModTestRunner/Screenshots/<run start>/<mod>.<suite>.<scenario>.<label>.png`, with the console hidden for that frame |
 | Cleanup | `SetConfig` (changes a config entry for one scenario), `OnCleanup` (any other restore step) |
 
 After every scenario, the runner destroys what `Spawned`, `SpawnPrefab` and `SpawnPickup` made. It then undoes the
