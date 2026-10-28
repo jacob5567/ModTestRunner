@@ -32,6 +32,9 @@ namespace ModTestRunner
         public readonly string Scene;
         // Changes the run for good (earns a one-time milestone, say), so it runs after everything else.
         public readonly bool RunsLast;
+        // Runs only when its suite is named with --suite, not in a plain mod_test or mod_test --mod: for slow or
+        // stage-changing suites that aren't checks, such as taking screenshots.
+        public readonly bool OnlyWhenNamed;
         public readonly Func<Harness, IEnumerator> Run;
 
         // The mod that registered it, set by TestRegistry.
@@ -39,7 +42,8 @@ namespace ModTestRunner
 
         public string FullName => $"{Mod?.Name}.{Suite}.{Name}";
 
-        public Scenario(int phase, string suite, string name, string scene, Func<Harness, IEnumerator> run, bool runsLast = false)
+        public Scenario(int phase, string suite, string name, string scene, Func<Harness, IEnumerator> run, bool runsLast = false,
+            bool onlyWhenNamed = false)
         {
             Phase = phase;
             Suite = suite;
@@ -47,6 +51,7 @@ namespace ModTestRunner
             Scene = scene;
             Run = run;
             RunsLast = runsLast;
+            OnlyWhenNamed = onlyWhenNamed;
         }
     }
 

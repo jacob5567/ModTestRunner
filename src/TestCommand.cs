@@ -18,6 +18,7 @@ namespace ModTestRunner
             "mod_test --suite <suite>          runs one suite (-s); write <mod>.<suite> when two mods have a suite of that name",
             "mod_test --mod <mod> --suite <s>  runs that mod's suite",
             "mod_test list [...]               lists what the same flags would run, instead of running it",
+            "Some suites (screenshots, say) run only when named with --suite.",
         };
 
         public static void Run(ConCommandArgs args)
@@ -92,7 +93,7 @@ namespace ModTestRunner
                 }
             }
             List<Scenario> inMods = mods.Count == 0 ? all : all.Where(s => mods.Any(mod => Same(s.Mod.Name, mod))).ToList();
-            if (suites.Count == 0) return inMods;
+            if (suites.Count == 0) return inMods.Where(s => !s.OnlyWhenNamed).ToList();
 
             HashSet<Scenario> inSuites = new HashSet<Scenario>();
             foreach (string suite in suites)
@@ -131,6 +132,12 @@ namespace ModTestRunner
             }
             ModTestRunnerPlugin.Log.LogInfo($"{picked.Count} scenarios. They run by phase, grouped by stage; ones that change the run "
                 + "for good run last.");
+            List<string> namedOnly = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Contains(s))
+                .Select(s => $"{s.Mod.Name}.{s.Suite}").Distinct().ToList();
+            if (namedOnly.Count > 0)
+            {
+                ModTestRunnerPlugin.Log.LogInfo("Run only when named with --suite: " + string.Join(", ", namedOnly) + ".");
+            }
         }
 
         private static void LogUsage()

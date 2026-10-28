@@ -87,7 +87,7 @@ is logged.
 
 ### Scenario
 
-`new Scenario(phase, suite, name, scene, run, runsLast: false)`
+`new Scenario(phase, suite, name, scene, run, runsLast: false, onlyWhenNamed: false)`
 
 - **phase**: scenarios run in ascending phase order. Put scenarios that change a stage for good (starting its teleporter,
   killing its boss) in a later phase than the ones that need it untouched.
@@ -96,6 +96,8 @@ is logged.
   scenarios in a phase that use it. Pass null to run wherever the player is.
 - **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after everything
   else.
+- **onlyWhenNamed**: for suites that aren't checks, or are slow, such as taking screenshots. They run only when their
+  suite is named with `--suite`, not in a plain `mod_test` or `mod_test --mod`. `mod_test list` names them.
 
 To give your `Precondition` more to go on, subclass `Scenario`. For example, KarmaWarnings' `KarmaScenario` lists the
 triggers a scenario needs unearned.
