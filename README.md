@@ -21,13 +21,15 @@ Start a run, then open the console (Ctrl+Alt+`) and use `mod_test`:
 | `mod_test --mod <mod>` | Runs one mod's scenarios. Short form: `-m`. |
 | `mod_test --suite <suite>` | Runs one suite. Short form: `-s`. If two mods have a suite with that name, write `<mod>.<suite>` or add `--mod`. |
 | `mod_test --mod <mod> --suite <suite>` | Runs one suite of one mod. |
+| `mod_test --test <test>` | Runs one scenario. Short form: `-t`. If two suites have a test with that name, write `<suite>.<test>` or `<mod>.<suite>.<test>`, or add `--suite` or `--mod`. |
 | `mod_test list [flags]` | Lists what the same flags would run, without running it. |
 | `mod_test help` | Shows these forms and the registered mods. |
 
-Suites that take screenshots, or are otherwise slow, can be marked to run only when named with `--suite`; `mod_test list`
-names them. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
+Suites that take screenshots, or are otherwise slow, can be marked to run only when named with `--suite`, or when one
+of their tests is named with `--test`; `mod_test list` names them. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
 
-`--mod` and `--suite` can each be given more than once. Names aren't case-sensitive.
+`--mod`, `--suite` and `--test` can each be given more than once, and together they narrow each other: `--test` picks
+among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
 
 Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures.
 
@@ -95,12 +97,14 @@ is logged.
 - **phase**: scenarios run in ascending phase order. Put scenarios that change a stage for good (starting its teleporter,
   killing its boss) in a later phase than the ones that need it untouched.
 - **suite**: the group `--suite` picks.
+- **name**: what `--test` picks.
 - **scene**: the stage to run in (`Stages.*`, or any `SceneDef.cachedName`). Each stage is loaded once for all the
   scenarios in a phase that use it. Pass null to run wherever the player is.
 - **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after everything
   else.
 - **onlyWhenNamed**: for suites that aren't checks, or are slow, such as taking screenshots. They run only when their
-  suite is named with `--suite`, not in a plain `mod_test` or `mod_test --mod`. `mod_test list` names them.
+  suite is named with `--suite` or one of their tests with `--test`, not in a plain `mod_test` or `mod_test --mod`.
+  `mod_test list` names them.
 
 To give your `Precondition` more to go on, subclass `Scenario`. For example, KarmaWarnings' `KarmaScenario` lists the
 triggers a scenario needs unearned.
