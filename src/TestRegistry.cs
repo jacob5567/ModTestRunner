@@ -25,6 +25,11 @@ namespace ModTestRunner
             ModTestRunnerPlugin.Log.LogInfo($"Registered the tests for {tests.Name}.");
         }
 
+        internal static int IndexOf(ModTests mod)
+        {
+            return mods.IndexOf(mod);
+        }
+
         internal static ModTests Find(string name)
         {
             return mods.FirstOrDefault(mod => string.Equals(mod.Name, name, StringComparison.OrdinalIgnoreCase));
@@ -67,9 +72,10 @@ namespace ModTestRunner
             {
                 ModTestRunnerPlugin.Log.LogWarning($"{mod.Name} has {repeated.Count()} suites called '{repeated.Key}'.");
             }
-            foreach (Suite suite in suites)
+            for (int i = 0; i < suites.Count; i++)
             {
-                suite.Mod = mod;
+                suites[i].Mod = mod;
+                suites[i].Order = i;
             }
             foreach (Scenario scenario in scenarios)
             {

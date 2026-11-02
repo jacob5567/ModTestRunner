@@ -22,15 +22,15 @@ namespace ModTestRunner
     // of them, or none.
     public class Scenario
     {
-        // Phases order the run: lower phases first. A mod uses them to keep scenarios that change a stage (starting its
-        // teleporter, killing its boss) after the ones that need it untouched.
+        // Phases order a suite's scenarios: lower phases first. A mod uses them to keep scenarios that change a stage
+        // (starting its teleporter, killing its boss) after the ones that need it untouched.
         public readonly int Phase;
         // Unique among the mod's scenarios: what mod_test --test picks, and what suites list it by.
         public readonly string Name;
         // The stage to be in (SceneDef.cachedName), loaded once with next_stage and kept while the next scenarios need
         // the same one. Null runs it wherever the player is.
         public readonly string Scene;
-        // Changes the run for good (earns a one-time milestone, say), so it runs after everything else.
+        // Changes the run for good (earns a one-time milestone, say), so it runs after every suite (RunPlan).
         public readonly bool RunsLast;
         public readonly Func<Harness, IEnumerator> Run;
 
@@ -54,8 +54,8 @@ namespace ModTestRunner
         }
     }
 
-    // The run order: scenarios that run last at the end, then by phase, then grouped by stage. Within a stage they keep
-    // their file order, so a scenario that changes a stage goes after the others.
+    // The order within each part of a run (RunPlan): scenarios that run last at the end, then by phase, then grouped by
+    // stage. Within a stage they keep their file order, so a scenario that changes a stage goes after the others.
     internal static class ScenarioOrder
     {
         public static List<Scenario> Sort(List<Scenario> list)

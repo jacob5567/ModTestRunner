@@ -62,6 +62,10 @@ namespace ModTestRunner
         private readonly HashSet<ConfigEntryBase> changedConfig = new HashSet<ConfigEntryBase>();
         private Exception error;
         private string currentScene;
+        // The survivor the player was when the run began, which each part of the run starts as again.
+        private BodyIndex startBody = BodyIndex.None;
+        // Set at the start of each part of the run, until its first scenario has its stage.
+        private bool resetPending;
         // The scenario in progress, whose mod readies stages, cleans up and explains failures.
         private Scenario scenario;
 
@@ -78,7 +82,7 @@ namespace ModTestRunner
 
         // ---- Running the picked scenarios ----
 
-        internal static void Start(List<Scenario> picked)
+        internal static void Start(List<RunPart> picked)
         {
             if (running)
             {
@@ -95,61 +99,76 @@ namespace ModTestRunner
             ModTestRunnerPlugin.Instance.StartCoroutine(new Harness().RunScenarios(picked));
         }
 
-        private IEnumerator RunScenarios(List<Scenario> list)
+        private IEnumerator RunScenarios(List<RunPart> parts)
         {
             int passed = 0, failed = 0, skipped = 0;
             List<string> failures = new List<string>();
-            ModTestRunnerPlugin.Log.LogInfo($"Running {list.Count} scenarios.");
+            ModTestRunnerPlugin.Log.LogInfo($"Running {parts.Sum(part => part.Scenarios.Count)} scenarios in {parts.Count} " +
+                                            "suites, each from a clean start.");
+            CharacterBody body = LocalBody;
+            startBody = body ? body.bodyIndex : BodyIndex.None;
 
             try
             {
-                foreach (Scenario next in list)
+                foreach (RunPart part in parts)
                 {
-                    scenario = next;
-                    string skip = Precondition(scenario);
-                    if (skip != null)
+                    ModTestRunnerPlugin.Log.LogInfo($"Suite {part.Name}: {part.Scenarios.Count} scenarios.");
+                    // Its first stage loads afresh, and then the run is reset (ResetForSuite).
+                    currentScene = null;
+                    resetPending = true;
+                    foreach (Scenario next in part.Scenarios)
                     {
-                        skipped++;
-                        ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {skip}");
-                        continue;
-                    }
+                        scenario = next;
+                        string skip = Precondition(scenario);
+                        if (skip != null)
+                        {
+                            skipped++;
+                            ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {skip}");
+                            continue;
+                        }
 
-                    float started = Time.realtimeSinceStartup;
-                    error = null;
-                    if (scenario.Scene != null && scenario.Scene != currentScene)
-                    {
-                        yield return Drive(LoadScene(scenario.Scene));
-                        currentScene = error == null ? scenario.Scene : null;
-                    }
-                    if (error == null)
-                    {
-                        yield return Drive(scenario.Run(this));
-                    }
+                        float started = Time.realtimeSinceStartup;
+                        error = null;
+                        if (scenario.Scene != null && scenario.Scene != currentScene)
+                        {
+                            yield return Drive(LoadScene(scenario.Scene));
+                            currentScene = error == null ? scenario.Scene : null;
+                        }
+                        if (error == null && resetPending)
+                        {
+                            yield return Drive(ResetForSuite());
+                            resetPending = false;
+                        }
+                        if (error == null)
+                        {
+                            yield return Drive(scenario.Run(this));
+                        }
 
-                    string time = $"{Time.realtimeSinceStartup - started:0.0}s";
-                    if (error == null)
-                    {
-                        passed++;
-                        ModTestRunnerPlugin.Log.LogInfo($"PASS  {scenario.FullName} ({time})");
-                    }
-                    else if (error is ScenarioSkipped)
-                    {
-                        skipped++;
-                        ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {error.Message}");
-                    }
-                    else
-                    {
-                        failed++;
-                        string message = error is TestFailure ? error.Message : error.ToString();
-                        failures.Add($"{scenario.FullName}: {message}");
-                        ModTestRunnerPlugin.Log.LogError($"FAIL  {scenario.FullName} ({time}): {message}");
-                    }
+                        string time = $"{Time.realtimeSinceStartup - started:0.0}s";
+                        if (error == null)
+                        {
+                            passed++;
+                            ModTestRunnerPlugin.Log.LogInfo($"PASS  {scenario.FullName} ({time})");
+                        }
+                        else if (error is ScenarioSkipped)
+                        {
+                            skipped++;
+                            ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {error.Message}");
+                        }
+                        else
+                        {
+                            failed++;
+                            string message = error is TestFailure ? error.Message : error.ToString();
+                            failures.Add($"{scenario.FullName}: {message}");
+                            ModTestRunnerPlugin.Log.LogError($"FAIL  {scenario.FullName} ({time}): {message}");
+                        }
 
-                    error = null;
-                    yield return Drive(Cleanup());
-                    if (error != null)
-                    {
-                        ModTestRunnerPlugin.Log.LogWarning($"Cleanup after {scenario.FullName} failed: {error.Message}");
+                        error = null;
+                        yield return Drive(Cleanup());
+                        if (error != null)
+                        {
+                            ModTestRunnerPlugin.Log.LogWarning($"Cleanup after {scenario.FullName} failed: {error.Message}");
+                        }
                     }
                 }
 
@@ -168,6 +187,32 @@ namespace ModTestRunner
             finally
             {
                 running = false;
+            }
+        }
+
+        // A clean start for a suite, on its first stage: the stage count back to the first stage's, and the player back as
+        // the survivor they were when the run began, if a suite before turned them into another. Server state; the
+        // runner is the host.
+        // The survivor goes first: a body spawned while the count is 0 arrives in a drop pod (Run.spawnWithPod).
+        private IEnumerator ResetForSuite()
+        {
+            if (!NetworkServer.active) yield break;
+            CharacterMaster master = LocalUser ? LocalUser.master : null;
+            CharacterBody body = LocalBody;
+            if (master && startBody != BodyIndex.None && !(body && body.bodyIndex == startBody))
+            {
+                string bodyName = BodyCatalog.GetBodyName(startBody);
+                ModTests mod = scenario.Mod;
+                master.TransformBody(bodyName);
+                yield return Until(() => LocalBody && LocalBody.bodyIndex == startBody && mod.Ready(),
+                    $"the player back as {bodyName}");
+                yield return Wait(TeleportSettleSeconds);
+            }
+            Run run = Run.instance;
+            if (run)
+            {
+                run.NetworkstageClearCount = 0;
+                run.NetworkstageClearCountAtLoopStart = 0;
             }
         }
 

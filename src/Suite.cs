@@ -14,8 +14,9 @@ namespace ModTestRunner
         public readonly bool OnlyWhenNamed;
         public readonly IReadOnlyList<Scenario> Scenarios;
 
-        // The mod that registered it, set by TestRegistry.
+        // The mod that registered it, and its place among the mod's suites, set by TestRegistry.
         public ModTests Mod { get; internal set; }
+        internal int Order { get; set; }
 
         public Suite(string name, params Scenario[] scenarios) : this(name, false, scenarios)
         {

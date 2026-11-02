@@ -27,7 +27,12 @@ Start a run, then open the console (Ctrl+Alt+`) and use `mod_test`:
 
 A plain `mod_test` runs every scenario. A suite can opt out of that with `onlyWhenNamed`, for slow ones: its tests then
 run only when it is named with `--suite`, or a test with `--test`, unless a test is also in a suite without the mark;
-`mod_test list` names such suites. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
+`mod_test list` names such suites.
+
+A run goes suite by suite, in the order the mods registered and declared their suites, and each scenario runs once,
+with the first suite that holds it. Each suite starts clean: its first stage loads afresh, the player is turned back
+into the survivor they were when the run began, and the stage count goes back to the first stage's. Scenarios in no
+suite run after the suites, and ones marked `runsLast` after everything. `mod_test list` shows that order. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
 
 `--mod`, `--suite` and `--test` can each be given more than once, and together they narrow each other: `--test` picks
 among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
@@ -97,14 +102,14 @@ is logged.
 
 `new Scenario(phase, name, scene, run, runsLast: false)`
 
-- **phase**: scenarios run in ascending phase order. Put scenarios that change a stage for good (starting its teleporter,
-  killing its boss) in a later phase than the ones that need it untouched.
+- **phase**: within a suite, scenarios run in ascending phase order. Put scenarios that change a stage for good
+  (starting its teleporter, killing its boss) in a later phase than the ones that need it untouched.
 - **name**: what `--test` picks, and what suites list the scenario by. Unique among the mod's scenarios; its full name
   is `<mod>.<name>`, as in the log and screenshot file names.
 - **scene**: the stage to run in (`Stages.*`, or any `SceneDef.cachedName`). Each stage is loaded once for all the
   scenarios in a phase that use it. Pass null to run wherever the player is.
-- **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after everything
-  else.
+- **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after every
+  suite, together.
 
 ### Suite
 

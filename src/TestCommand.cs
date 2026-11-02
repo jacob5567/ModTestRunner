@@ -12,9 +12,6 @@ namespace ModTestRunner
             + "[--test <test>]. "
             + "mod_test help for more.";
 
-        // How mod_test list heads the scenarios that are in no suite.
-        private const string NoSuite = "(no suite)";
-
         private static readonly string[] Usage =
         {
             "mod_test                          runs every registered mod's scenarios",
@@ -82,11 +79,11 @@ namespace ModTestRunner
 
             if (list)
             {
-                List(picked);
+                List(RunPlan.Split(picked, suites), picked.Count);
             }
             else
             {
-                Harness.Start(picked);
+                Harness.Start(RunPlan.Split(picked, suites));
             }
         }
 
@@ -174,24 +171,18 @@ namespace ModTestRunner
             return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
         }
 
-        private static void List(List<Scenario> picked)
+        // What the run would do, in order: each part, from a clean start, and its scenarios.
+        private static void List(List<RunPart> plan, int count)
         {
-            foreach (IGrouping<ModTests, Scenario> mod in picked.GroupBy(s => s.Mod))
+            foreach (RunPart part in plan)
             {
-                ModTestRunnerPlugin.Log.LogInfo($"{mod.Key.Name}:");
-                // A scenario in several suites is listed under each, and one in none on its own line; the count below
-                // has each once.
-                foreach (IGrouping<string, Scenario> suite in mod
-                             .SelectMany(s => s.Suites.Count > 0
-                                 ? s.Suites.Select(own => (name: own.Name, scenario: s))
-                                 : new[] { (name: NoSuite, scenario: s) })
-                             .GroupBy(pair => pair.name, pair => pair.scenario, StringComparer.OrdinalIgnoreCase))
-                {
-                    ModTestRunnerPlugin.Log.LogInfo($"  {suite.Key} ({suite.Count()}): " + string.Join(", ", suite.Select(s => s.Name)));
-                }
+                ModTestRunnerPlugin.Log.LogInfo($"  {part.Name} ({part.Scenarios.Count}): " +
+                                                string.Join(", ", part.Scenarios.Select(s => s.Name)));
             }
-            ModTestRunnerPlugin.Log.LogInfo($"{picked.Count} scenarios. They run by phase, grouped by stage; ones that change the run "
-                + "for good run last.");
+            ModTestRunnerPlugin.Log.LogInfo($"{count} scenarios, run suite by suite in this order, each suite from the first stage "
+                + "and the survivor the run began as. A scenario in several suites runs once, with the first; within a suite "
+                + "they run by phase, grouped by stage; ones that change the run for good run last.");
+            List<Scenario> picked = plan.SelectMany(part => part.Scenarios).ToList();
             List<string> namedOnly = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Any(p => p.FullName == s.FullName))
                 .SelectMany(s => s.Suites.Select(own => $"{s.Mod.Name}.{own.Name}")).Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
