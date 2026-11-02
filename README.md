@@ -100,7 +100,7 @@ is logged.
 
 ### Scenario
 
-`new Scenario(phase, name, scene, run, runsLast: false)`
+`new Scenario(phase, name, scene, run, runsLast: false, takesDamage: false)`
 
 - **phase**: within a suite, scenarios run in ascending phase order. Put scenarios that change a stage for good
   (starting its teleporter, killing its boss) in a later phase than the ones that need it untouched.
@@ -110,6 +110,8 @@ is logged.
   scenarios in a phase that use it. Pass null to run wherever the player is.
 - **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after every
   suite, together.
+- **takesDamage**: for scenarios that need the player to take damage. Every other scenario runs with the player in god
+  mode, kept on through new stages and survivors; the player gets back whatever they had when the run ends.
 
 ### Suite
 

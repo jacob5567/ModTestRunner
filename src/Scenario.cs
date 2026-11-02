@@ -32,6 +32,8 @@ namespace ModTestRunner
         public readonly string Scene;
         // Changes the run for good (earns a one-time milestone, say), so it runs after every suite (RunPlan).
         public readonly bool RunsLast;
+        // Needs the player to take damage. Otherwise the player is in god mode while it runs (Harness).
+        public readonly bool TakesDamage;
         public readonly Func<Harness, IEnumerator> Run;
 
         // The mod that registered it, and the suites that list it, set by TestRegistry.
@@ -44,13 +46,15 @@ namespace ModTestRunner
 
         public string FullName => $"{Mod?.Name}.{Name}";
 
-        public Scenario(int phase, string name, string scene, Func<Harness, IEnumerator> run, bool runsLast = false)
+        public Scenario(int phase, string name, string scene, Func<Harness, IEnumerator> run, bool runsLast = false,
+            bool takesDamage = false)
         {
             Phase = phase;
             Name = name;
             Scene = scene;
             Run = run;
             RunsLast = runsLast;
+            TakesDamage = takesDamage;
         }
     }
 

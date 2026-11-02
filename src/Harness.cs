@@ -66,6 +66,10 @@ namespace ModTestRunner
         private BodyIndex startBody = BodyIndex.None;
         // Set at the start of each part of the run, until its first scenario has its stage.
         private bool resetPending;
+        // Whether the player's body is kept in god mode: for each scenario that doesn't take damage. What the player
+        // had when the run began comes back at the end.
+        private bool godMode;
+        private bool startGodMode;
         // The scenario in progress, whose mod readies stages, cleans up and explains failures.
         private Scenario scenario;
 
@@ -107,6 +111,7 @@ namespace ModTestRunner
                                             "suites, each from a clean start.");
             CharacterBody body = LocalBody;
             startBody = body ? body.bodyIndex : BodyIndex.None;
+            startGodMode = body && body.healthComponent && body.healthComponent.godMode;
 
             try
             {
@@ -129,6 +134,7 @@ namespace ModTestRunner
 
                         float started = Time.realtimeSinceStartup;
                         error = null;
+                        godMode = !scenario.TakesDamage;
                         if (scenario.Scene != null && scenario.Scene != currentScene)
                         {
                             yield return Drive(LoadScene(scenario.Scene));
@@ -186,6 +192,8 @@ namespace ModTestRunner
             }
             finally
             {
+                godMode = startGodMode;
+                KeepGodMode();
                 running = false;
             }
         }
@@ -213,6 +221,18 @@ namespace ModTestRunner
             {
                 run.NetworkstageClearCount = 0;
                 run.NetworkstageClearCountAtLoopStart = 0;
+            }
+        }
+
+        // Each frame a scenario waits: a new body (a new stage, another survivor, a respawn) starts without god mode, so it
+        // is set again. Damage is the server's, and the runner is the host.
+        private void KeepGodMode()
+        {
+            CharacterBody body = LocalBody;
+            HealthComponent health = body ? body.healthComponent : null;
+            if (NetworkServer.active && health && health.godMode != godMode)
+            {
+                health.godMode = godMode;
             }
         }
 
@@ -260,6 +280,7 @@ namespace ModTestRunner
                 }
                 else
                 {
+                    KeepGodMode();
                     yield return yielded;
                 }
             }
