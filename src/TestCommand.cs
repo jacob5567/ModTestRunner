@@ -12,16 +12,20 @@ namespace ModTestRunner
             + "[--test <test>]. "
             + "mod_test help for more.";
 
+        // How mod_test list heads the scenarios that are in no suite.
+        private const string NoSuite = "(no suite)";
+
         private static readonly string[] Usage =
         {
             "mod_test                          runs every registered mod's scenarios",
             "mod_test --mod <mod>              runs one mod's scenarios (-m)",
             "mod_test --suite <suite>          runs one suite (-s); write <mod>.<suite> when two mods have a suite of that name",
+            "                                  (a scenario can be in several suites)",
             "mod_test --mod <mod> --suite <s>  runs that mod's suite",
-            "mod_test --test <test>            runs one scenario (-t); write <suite>.<test> or <mod>.<suite>.<test> when the name "
-                + "is shared",
+            "mod_test --test <test>            runs one scenario (-t); write <mod>.<test> when two mods have a test of that name",
             "mod_test list [...]               lists what the same flags would run, instead of running it",
-            "Some suites (screenshots, say) run only when named with --suite, or when one of their tests is named with --test.",
+            "Every scenario runs in a plain mod_test, except those only in suites marked to run only when named with --suite "
+                + "(or a test with --test).",
         };
 
         public static void Run(ConCommandArgs args)
@@ -120,7 +124,8 @@ namespace ModTestRunner
             HashSet<Scenario> inSuites = new HashSet<Scenario>();
             foreach (string suite in suites)
             {
-                List<Scenario> matched = inMods.Where(s => Same(s.Suite, suite) || Same($"{s.Mod.Name}.{s.Suite}", suite)).ToList();
+                List<Scenario> matched = inMods.Where(s => s.Suites.Any(own => Same(own.Name, suite) ||
+                                                                               Same($"{s.Mod.Name}.{own.Name}", suite))).ToList();
                 if (matched.Count == 0)
                 {
                     error = $"No suite called '{suite}'" + (mods.Count > 0 ? $" in {string.Join(", ", mods)}" : "") + ". Use mod_test list.";
@@ -137,8 +142,7 @@ namespace ModTestRunner
             return inMods.Where(inSuites.Contains).ToList();
         }
 
-        // A test is named by its own name, <suite>.<name> or <mod>.<suite>.<name>, among the scenarios the mods and
-        // suites picked.
+        // A test is named by its own name, or <mod>.<name>, among the scenarios the mods and suites picked.
         private static List<Scenario> PickTests(List<Scenario> candidates, List<string> mods, List<string> suites,
             List<string> tests, out string error)
         {
@@ -146,8 +150,7 @@ namespace ModTestRunner
             HashSet<Scenario> named = new HashSet<Scenario>();
             foreach (string test in tests)
             {
-                List<Scenario> matched = candidates.Where(s => Same(s.Name, test) || Same($"{s.Suite}.{s.Name}", test) ||
-                                                               Same(s.FullName, test)).ToList();
+                List<Scenario> matched = candidates.Where(s => Same(s.Name, test) || Same(s.FullName, test)).ToList();
                 if (matched.Count == 0)
                 {
                     List<string> scope = mods.Concat(suites).ToList();
@@ -155,11 +158,10 @@ namespace ModTestRunner
                             ". Use mod_test list.";
                     return null;
                 }
-                List<string> owners = matched.Select(s => $"{s.Mod.Name}.{s.Suite}").Distinct().ToList();
+                List<string> owners = matched.Select(s => s.Mod.Name).Distinct().ToList();
                 if (owners.Count > 1)
                 {
-                    error = $"{string.Join(" and ", owners)} each have a test called '{test}'. Add --mod or --suite, or write "
-                        + $"<suite>.{test} or <mod>.<suite>.{test}.";
+                    error = $"{string.Join(" and ", owners)} each have a test called '{test}'. Add --mod, or write <mod>.{test}.";
                     return null;
                 }
                 named.UnionWith(matched);
@@ -177,15 +179,22 @@ namespace ModTestRunner
             foreach (IGrouping<ModTests, Scenario> mod in picked.GroupBy(s => s.Mod))
             {
                 ModTestRunnerPlugin.Log.LogInfo($"{mod.Key.Name}:");
-                foreach (IGrouping<string, Scenario> suite in mod.GroupBy(s => s.Suite))
+                // A scenario in several suites is listed under each, and one in none on its own line; the count below
+                // has each once.
+                foreach (IGrouping<string, Scenario> suite in mod
+                             .SelectMany(s => s.Suites.Count > 0
+                                 ? s.Suites.Select(own => (name: own.Name, scenario: s))
+                                 : new[] { (name: NoSuite, scenario: s) })
+                             .GroupBy(pair => pair.name, pair => pair.scenario, StringComparer.OrdinalIgnoreCase))
                 {
                     ModTestRunnerPlugin.Log.LogInfo($"  {suite.Key} ({suite.Count()}): " + string.Join(", ", suite.Select(s => s.Name)));
                 }
             }
             ModTestRunnerPlugin.Log.LogInfo($"{picked.Count} scenarios. They run by phase, grouped by stage; ones that change the run "
                 + "for good run last.");
-            List<string> namedOnly = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Contains(s))
-                .Select(s => $"{s.Mod.Name}.{s.Suite}").Distinct().ToList();
+            List<string> namedOnly = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Any(p => p.FullName == s.FullName))
+                .SelectMany(s => s.Suites.Select(own => $"{s.Mod.Name}.{own.Name}")).Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
             if (namedOnly.Count > 0)
             {
                 ModTestRunnerPlugin.Log.LogInfo("Run only when named with --suite, or their tests with --test: "

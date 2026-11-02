@@ -19,14 +19,15 @@ Start a run, then open the console (Ctrl+Alt+`) and use `mod_test`:
 |---|---|
 | `mod_test` | Runs every registered mod's scenarios. |
 | `mod_test --mod <mod>` | Runs one mod's scenarios. Short form: `-m`. |
-| `mod_test --suite <suite>` | Runs one suite. Short form: `-s`. If two mods have a suite with that name, write `<mod>.<suite>` or add `--mod`. |
+| `mod_test --suite <suite>` | Runs one suite. Short form: `-s`. If two mods have a suite with that name, write `<mod>.<suite>` or add `--mod`. A scenario can be in several suites. |
 | `mod_test --mod <mod> --suite <suite>` | Runs one suite of one mod. |
-| `mod_test --test <test>` | Runs one scenario. Short form: `-t`. If two suites have a test with that name, write `<suite>.<test>` or `<mod>.<suite>.<test>`, or add `--suite` or `--mod`. |
+| `mod_test --test <test>` | Runs one scenario. Short form: `-t`. If two mods have a test with that name, write `<mod>.<test>` or add `--mod`. |
 | `mod_test list [flags]` | Lists what the same flags would run, without running it. |
 | `mod_test help` | Shows these forms and the registered mods. |
 
-Suites that take screenshots, or are otherwise slow, can be marked to run only when named with `--suite`, or when one
-of their tests is named with `--test`; `mod_test list` names them. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
+A plain `mod_test` runs every scenario. A suite can opt out of that with `onlyWhenNamed`, for slow ones: its tests then
+run only when it is named with `--suite`, or a test with `--test`, unless a test is also in a suite without the mark;
+`mod_test list` names such suites. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
 
 `--mod`, `--suite` and `--test` can each be given more than once, and together they narrow each other: `--test` picks
 among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
@@ -57,9 +58,11 @@ internal sealed class YourModTests : ModTests
 {
     public override string Name => "YourMod";
 
-    public override IEnumerable<Scenario> Scenarios()
+    // Each suite lists its scenarios; one scenario can be in several suites. Scenarios() can list more that are in
+    // no suite.
+    public override IEnumerable<Suite> Suites()
     {
-        yield return new Scenario(1, "pickups", "shows_on_lunar", Stages.TitanicPlains, ShowsOnLunar);
+        yield return new Suite("pickups", new Scenario(1, "shows_on_lunar", Stages.TitanicPlains, ShowsOnLunar));
     }
 
     // Optional overrides:
@@ -92,19 +95,27 @@ is logged.
 
 ### Scenario
 
-`new Scenario(phase, suite, name, scene, run, runsLast: false, onlyWhenNamed: false)`
+`new Scenario(phase, name, scene, run, runsLast: false)`
 
 - **phase**: scenarios run in ascending phase order. Put scenarios that change a stage for good (starting its teleporter,
   killing its boss) in a later phase than the ones that need it untouched.
-- **suite**: the group `--suite` picks.
-- **name**: what `--test` picks.
+- **name**: what `--test` picks, and what suites list the scenario by. Unique among the mod's scenarios; its full name
+  is `<mod>.<name>`, as in the log and screenshot file names.
 - **scene**: the stage to run in (`Stages.*`, or any `SceneDef.cachedName`). Each stage is loaded once for all the
   scenarios in a phase that use it. Pass null to run wherever the player is.
 - **runsLast**: for scenarios that change the run itself, such as earning a one-time unlock. They run after everything
   else.
-- **onlyWhenNamed**: for suites that aren't checks, or are slow, such as taking screenshots. They run only when their
-  suite is named with `--suite` or one of their tests with `--test`, not in a plain `mod_test` or `mod_test --mod`.
-  `mod_test list` names them.
+
+### Suite
+
+`new Suite(name, onlyWhenNamed: false, scenarios...)`, returned from `ModTests.Suites()`
+
+- **name**: what `--suite` picks.
+- **onlyWhenNamed**: for suites that aren't checks, or are slow, such as taking screenshots. Their scenarios run only
+  when the suite is named with `--suite` or a scenario with `--test`, not in a plain `mod_test` or `mod_test --mod`,
+  unless a scenario is also in a suite without it. `mod_test list` names them.
+- **scenarios**: the suite's scenarios, as an array or a list. A scenario can be in any number of suites: list it in
+  each, built by the same method or not, since suites hold scenarios by name. The runner runs each once.
 
 To give your `Precondition` more to go on, subclass `Scenario`. For example, KarmaWarnings' `KarmaScenario` lists the
 triggers a scenario needs unearned.
@@ -117,7 +128,7 @@ triggers a scenario needs unearned.
 | Commands and spawning | `Cmd` (with `Commands.*`), `Spawned<T>`, `SpawnPrefab<T>`, `SpawnPickup`, `ItemOfTier`, `FindBody` |
 | Moving and aiming | `StandBefore`, `StandNear`, `Teleport`, `AimAt`, `AimAway`, `Interact` |
 | State | `Body`, `LocalBody`, `SetHealthFraction`, `GoTo` (another stage mid-scenario) |
-| Screenshots | `Screenshot(label)`: saves the screen as `BepInEx/ModTestRunner/Screenshots/<run start>/<mod>.<suite>.<scenario>.<label>.png`, with the console hidden for that frame |
+| Screenshots | `Screenshot(label)`: saves the screen as `BepInEx/ModTestRunner/Screenshots/<run start>/<mod>.<scenario>.<label>.png`, with the console hidden for that frame |
 | Cleanup | `SetConfig` (changes a config entry for one scenario), `OnCleanup` (any other restore step) |
 
 After every scenario, the runner destroys what `Spawned`, `SpawnPrefab` and `SpawnPickup` made. It then undoes the

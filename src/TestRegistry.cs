@@ -30,7 +30,9 @@ namespace ModTestRunner
             return mods.FirstOrDefault(mod => string.Equals(mod.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        // Every registered scenario, in run order. A mod whose scenarios can't be listed is left out, with an error.
+        // Every registered scenario, in run order, each knowing its mod and the suites that list it. A mod's scenarios
+        // are its list (ModTests.Scenarios) and its suites' scenarios, each name once. A mod whose scenarios or suites
+        // can't be listed is left out, with an error.
         internal static List<Scenario> Scenarios()
         {
             List<Scenario> all = new List<Scenario>();
@@ -38,19 +40,43 @@ namespace ModTestRunner
             {
                 try
                 {
-                    foreach (Scenario scenario in mod.Scenarios())
-                    {
-                        scenario.Mod = mod;
-                        all.Add(scenario);
-                    }
+                    all.AddRange(ScenariosOf(mod));
                 }
                 catch (Exception exception)
                 {
-                    all.RemoveAll(scenario => scenario.Mod == mod);
                     ModTestRunnerPlugin.Log.LogError($"Could not list the scenarios of {mod.Name}: {exception}");
                 }
             }
             return ScenarioOrder.Sort(all);
+        }
+
+        private static List<Scenario> ScenariosOf(ModTests mod)
+        {
+            List<Suite> suites = mod.Suites().ToList();
+            List<Scenario> scenarios = new List<Scenario>();
+            HashSet<string> names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Scenario scenario in mod.Scenarios().Concat(suites.SelectMany(suite => suite.Scenarios)))
+            {
+                if (names.Add(scenario.Name))
+                {
+                    scenarios.Add(scenario);
+                }
+            }
+            foreach (IGrouping<string, Suite> repeated in suites.GroupBy(suite => suite.Name, StringComparer.OrdinalIgnoreCase)
+                         .Where(group => group.Count() > 1))
+            {
+                ModTestRunnerPlugin.Log.LogWarning($"{mod.Name} has {repeated.Count()} suites called '{repeated.Key}'.");
+            }
+            foreach (Suite suite in suites)
+            {
+                suite.Mod = mod;
+            }
+            foreach (Scenario scenario in scenarios)
+            {
+                scenario.Mod = mod;
+                scenario.Suites = suites.Where(suite => suite.Holds(scenario)).ToList().AsReadOnly();
+            }
+            return scenarios;
         }
     }
 }

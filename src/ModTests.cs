@@ -9,8 +9,18 @@ namespace ModTestRunner
         // The name mod_test --mod picks it by, and the first part of each scenario's full name. No spaces.
         public abstract string Name { get; }
 
-        // Every scenario, in file order. The runner orders them (see Scenario).
-        public abstract IEnumerable<Scenario> Scenarios();
+        // Scenarios outside any suite, in file order. The runner runs these and every suite's scenarios, each once, in
+        // its own order (see Scenario).
+        public virtual IEnumerable<Scenario> Scenarios()
+        {
+            yield break;
+        }
+
+        // The mod's suites, each listing its scenarios. A scenario can be in several.
+        public virtual IEnumerable<Suite> Suites()
+        {
+            yield break;
+        }
 
         // Why the scenario can't run now (the mod is turned off, what it tests is already done, ...), or null. Called
         // before each scenario, once a run is in progress.
