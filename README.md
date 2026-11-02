@@ -37,7 +37,7 @@ suite run after the suites, and ones marked `runsLast` after everything. `mod_te
 `--mod`, `--suite` and `--test` can each be given more than once, and together they narrow each other: `--test` picks
 among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
 
-Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures.
+Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures for each mod, and a total when the run had several. Every line the runner writes about a mod's tests starts with `[<mod>.Tests]`, so `grep '\[YourMod.Tests\]'` finds a mod's whole run; a scenario's own lines can be written the same way with `h.Log(...)`.
 
 ## Writing tests for a mod
 
@@ -136,6 +136,7 @@ triggers a scenario needs unearned.
 | Moving and aiming | `StandBefore`, `StandNear`, `Teleport`, `AimAt`, `AimAway`, `Interact` |
 | State | `Body`, `LocalBody`, `SetHealthFraction`, `GoTo` (another stage mid-scenario) |
 | Screenshots | `Screenshot(label)`: saves the screen as `BepInEx/ModTestRunner/Screenshots/<run start>/<mod>.<scenario>.<label>.png`, with the console hidden for that frame |
+| Logging | `Log(message)`: writes a line to the BepInEx log tagged `[<mod>.Tests]`, as the runner's own lines are |
 | Cleanup | `SetConfig` (changes a config entry for one scenario), `OnCleanup` (any other restore step) |
 
 After every scenario, the runner destroys what `Spawned`, `SpawnPrefab` and `SpawnPickup` made. It then undoes the

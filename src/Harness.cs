@@ -46,7 +46,16 @@ namespace ModTestRunner
         private const string ScreenshotFolderName = "Screenshots";
         private readonly string screenshotFolder = Path.Combine(Paths.BepInExRootPath, nameof(ModTestRunner), ScreenshotFolderName,
             DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
-        private int screenshotCount;
+        // Each mod's results in this run, which the screenshots count into too.
+        private readonly Dictionary<ModTests, Tally> tallies = new Dictionary<ModTests, Tally>();
+
+        private sealed class Tally
+        {
+            public int Passed;
+            public int Skipped;
+            public int Screenshots;
+            public readonly List<string> Failures = new List<string>();
+        }
 
         // Where the last StandBefore put the player, for failure messages.
         private string lastStand = "never stood anywhere";
@@ -90,12 +99,13 @@ namespace ModTestRunner
         {
             if (running)
             {
-                ModTestRunnerPlugin.Log.LogWarning("A test run is already in progress.");
+                RunLog.Warning(RunLog.Tags(picked.SelectMany(part => part.Scenarios)), "A test run is already in progress.");
                 return;
             }
             if (!Chainloader.PluginInfos.ContainsKey(Commands.DebugToolkitGUID))
             {
-                ModTestRunnerPlugin.Log.LogError("DebugToolkit is not installed: the scenarios set the game up with its commands.");
+                RunLog.Error(RunLog.Tags(picked.SelectMany(part => part.Scenarios)),
+                    "DebugToolkit is not installed: the scenarios set the game up with its commands.");
                 return;
             }
 
@@ -105,10 +115,20 @@ namespace ModTestRunner
 
         private IEnumerator RunScenarios(List<RunPart> parts)
         {
-            int passed = 0, failed = 0, skipped = 0;
-            List<string> failures = new List<string>();
-            ModTestRunnerPlugin.Log.LogInfo($"Running {parts.Sum(part => part.Scenarios.Count)} scenarios in {parts.Count} " +
-                                            "suites, each from a clean start.");
+            // Each mod's results, in the order its scenarios first run.
+            foreach (Scenario each in parts.SelectMany(part => part.Scenarios))
+            {
+                if (!tallies.ContainsKey(each.Mod))
+                {
+                    tallies[each.Mod] = new Tally();
+                }
+            }
+            foreach (ModTests mod in tallies.Keys)
+            {
+                List<Scenario> its = parts.SelectMany(part => part.Scenarios).Where(each => each.Mod == mod).ToList();
+                int suites = parts.Count(part => part.Scenarios.Any(each => each.Mod == mod));
+                RunLog.Info(RunLog.Tag(mod), $"Running {its.Count} scenarios in {suites} suites, each from a clean start.");
+            }
             CharacterBody body = LocalBody;
             startBody = body ? body.bodyIndex : BodyIndex.None;
             startGodMode = body && body.healthComponent && body.healthComponent.godMode;
@@ -117,18 +137,20 @@ namespace ModTestRunner
             {
                 foreach (RunPart part in parts)
                 {
-                    ModTestRunnerPlugin.Log.LogInfo($"Suite {part.Name}: {part.Scenarios.Count} scenarios.");
+                    RunLog.Info(RunLog.Tags(part.Scenarios), $"Suite {part.Name}: {part.Scenarios.Count} scenarios.");
                     // Its first stage loads afresh, and then the run is reset (ResetForSuite).
                     currentScene = null;
                     resetPending = true;
                     foreach (Scenario next in part.Scenarios)
                     {
                         scenario = next;
+                        Tally tally = tallies[scenario.Mod];
+                        string tag = RunLog.Tag(scenario.Mod);
                         string skip = Precondition(scenario);
                         if (skip != null)
                         {
-                            skipped++;
-                            ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {skip}");
+                            tally.Skipped++;
+                            RunLog.Warning(tag, $"SKIP  {scenario.FullName}: {skip}");
                             continue;
                         }
 
@@ -153,42 +175,55 @@ namespace ModTestRunner
                         string time = $"{Time.realtimeSinceStartup - started:0.0}s";
                         if (error == null)
                         {
-                            passed++;
-                            ModTestRunnerPlugin.Log.LogInfo($"PASS  {scenario.FullName} ({time})");
+                            tally.Passed++;
+                            RunLog.Info(tag, $"PASS  {scenario.FullName} ({time})");
                         }
                         else if (error is ScenarioSkipped)
                         {
-                            skipped++;
-                            ModTestRunnerPlugin.Log.LogWarning($"SKIP  {scenario.FullName}: {error.Message}");
+                            tally.Skipped++;
+                            RunLog.Warning(tag, $"SKIP  {scenario.FullName}: {error.Message}");
                         }
                         else
                         {
-                            failed++;
                             string message = error is TestFailure ? error.Message : error.ToString();
-                            failures.Add($"{scenario.FullName}: {message}");
-                            ModTestRunnerPlugin.Log.LogError($"FAIL  {scenario.FullName} ({time}): {message}");
+                            tally.Failures.Add($"{scenario.FullName}: {message}");
+                            RunLog.Error(tag, $"FAIL  {scenario.FullName} ({time}): {message}");
                         }
 
                         error = null;
                         yield return Drive(Cleanup());
                         if (error != null)
                         {
-                            ModTestRunnerPlugin.Log.LogWarning($"Cleanup after {scenario.FullName} failed: {error.Message}");
+                            RunLog.Warning(tag, $"Cleanup after {scenario.FullName} failed: {error.Message}");
                         }
                     }
                 }
 
-                string summary = $"Mod tests: {passed} passed, {failed} failed, {skipped} skipped.";
-                ModTestRunnerPlugin.Log.LogInfo(summary);
-                if (screenshotCount > 0)
+                // A summary for each mod, the game's console included, then the run's total when it had several.
+                foreach (KeyValuePair<ModTests, Tally> entry in tallies)
                 {
-                    ModTestRunnerPlugin.Log.LogInfo($"Saved {screenshotCount} screenshots in {screenshotFolder}");
+                    string tag = RunLog.Tag(entry.Key);
+                    Tally tally = entry.Value;
+                    string summary = $"Mod tests: {tally.Passed} passed, {tally.Failures.Count} failed, {tally.Skipped} skipped.";
+                    RunLog.Info(tag, summary);
+                    if (tally.Screenshots > 0)
+                    {
+                        RunLog.Info(tag, $"Saved {tally.Screenshots} screenshots in {screenshotFolder}");
+                    }
+                    foreach (string failure in tally.Failures)
+                    {
+                        RunLog.Error(tag, "  " + failure);
+                    }
+                    Debug.Log($"{tag} {summary}" + (tally.Failures.Count > 0 ? " See the BepInEx log for the failures." : ""));
                 }
-                foreach (string failure in failures)
+                if (tallies.Count > 1)
                 {
-                    ModTestRunnerPlugin.Log.LogError("  " + failure);
+                    string tags = string.Join(" ", tallies.Keys.Select(RunLog.Tag));
+                    string total = $"Mod tests: {tallies.Values.Sum(t => t.Passed)} passed, " +
+                                   $"{tallies.Values.Sum(t => t.Failures.Count)} failed, {tallies.Values.Sum(t => t.Skipped)} skipped.";
+                    RunLog.Info(tags, total);
+                    Debug.Log($"{tags} {total}");
                 }
-                Debug.Log(summary + (failed > 0 ? " See the BepInEx log for the failures." : ""));
             }
             finally
             {
@@ -234,6 +269,12 @@ namespace ModTestRunner
             {
                 health.godMode = godMode;
             }
+        }
+
+        // A line in the log for the scenario in progress, tagged with its mod's tests as the runner's own lines are.
+        public void Log(string message)
+        {
+            RunLog.Info(RunLog.Tag(scenario?.Mod), message);
         }
 
         // Why the scenario can't run now, or null.
@@ -340,7 +381,7 @@ namespace ModTestRunner
                 }
                 catch (Exception exception)
                 {
-                    ModTestRunnerPlugin.Log.LogWarning($"A cleanup step after {scenario.FullName} failed: {exception.Message}");
+                    RunLog.Warning(RunLog.Tag(scenario.Mod), $"A cleanup step after {scenario.FullName} failed: {exception.Message}");
                 }
             }
             cleanups.Clear();
@@ -833,8 +874,11 @@ namespace ModTestRunner
                 }
                 string path = Path.Combine(screenshotFolder, name + ".png");
                 File.WriteAllBytes(path, shot.EncodeToPNG());
-                screenshotCount++;
-                ModTestRunnerPlugin.Log.LogInfo($"Screenshot: {path}");
+                if (scenario != null && tallies.TryGetValue(scenario.Mod, out Tally tally))
+                {
+                    tally.Screenshots++;
+                }
+                RunLog.Info(RunLog.Tag(scenario?.Mod), $"Screenshot: {path}");
             }
             finally
             {

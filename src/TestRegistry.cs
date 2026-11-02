@@ -18,11 +18,11 @@ namespace ModTestRunner
             if (tests == null) throw new ArgumentNullException(nameof(tests));
             if (Find(tests.Name) != null)
             {
-                ModTestRunnerPlugin.Log.LogWarning($"Tests for {tests.Name} are already registered.");
+                RunLog.Warning(RunLog.Tag(tests), "These tests are already registered.");
                 return;
             }
             mods.Add(tests);
-            ModTestRunnerPlugin.Log.LogInfo($"Registered the tests for {tests.Name}.");
+            RunLog.Info(RunLog.Tag(tests), $"Registered the tests for {tests.Name}.");
         }
 
         internal static int IndexOf(ModTests mod)
@@ -49,7 +49,7 @@ namespace ModTestRunner
                 }
                 catch (Exception exception)
                 {
-                    ModTestRunnerPlugin.Log.LogError($"Could not list the scenarios of {mod.Name}: {exception}");
+                    RunLog.Error(RunLog.Tag(mod), $"Could not list the scenarios of {mod.Name}: {exception}");
                 }
             }
             return ScenarioOrder.Sort(all);
@@ -70,7 +70,7 @@ namespace ModTestRunner
             foreach (IGrouping<string, Suite> repeated in suites.GroupBy(suite => suite.Name, StringComparer.OrdinalIgnoreCase)
                          .Where(group => group.Count() > 1))
             {
-                ModTestRunnerPlugin.Log.LogWarning($"{mod.Name} has {repeated.Count()} suites called '{repeated.Key}'.");
+                RunLog.Warning(RunLog.Tag(mod), $"{mod.Name} has {repeated.Count()} suites called '{repeated.Key}'.");
             }
             for (int i = 0; i < suites.Count; i++)
             {

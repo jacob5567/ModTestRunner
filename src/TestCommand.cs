@@ -73,7 +73,8 @@ namespace ModTestRunner
             List<Scenario> picked = Pick(all, mods, suites, tests, out string error);
             if (error != null)
             {
-                ModTestRunnerPlugin.Log.LogWarning(error);
+                // Tagged with the mods named, when they have tests.
+                RunLog.Warning(string.Join(" ", mods.Select(TestRegistry.Find).Where(found => found != null).Select(RunLog.Tag)), error);
                 return;
             }
 
@@ -176,19 +177,21 @@ namespace ModTestRunner
         {
             foreach (RunPart part in plan)
             {
-                ModTestRunnerPlugin.Log.LogInfo($"  {part.Name} ({part.Scenarios.Count}): " +
+                RunLog.Info(RunLog.Tags(part.Scenarios), $"  {part.Name} ({part.Scenarios.Count}): " +
                                                 string.Join(", ", part.Scenarios.Select(s => s.Name)));
             }
-            ModTestRunnerPlugin.Log.LogInfo($"{count} scenarios, run suite by suite in this order, each suite from the first stage "
+            RunLog.Info(RunLog.Tags(plan.SelectMany(part => part.Scenarios)),
+                $"{count} scenarios, run suite by suite in this order, each suite from the first stage "
                 + "and the survivor the run began as. A scenario in several suites runs once, with the first; within a suite "
                 + "they run by phase, grouped by stage; ones that change the run for good run last.");
             List<Scenario> picked = plan.SelectMany(part => part.Scenarios).ToList();
-            List<string> namedOnly = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Any(p => p.FullName == s.FullName))
-                .SelectMany(s => s.Suites.Select(own => $"{s.Mod.Name}.{own.Name}")).Distinct(StringComparer.OrdinalIgnoreCase)
+            List<Scenario> left = TestRegistry.Scenarios().Where(s => s.OnlyWhenNamed && !picked.Any(p => p.FullName == s.FullName))
                 .ToList();
+            List<string> namedOnly = left.SelectMany(s => s.Suites.Select(own => $"{s.Mod.Name}.{own.Name}"))
+                .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (namedOnly.Count > 0)
             {
-                ModTestRunnerPlugin.Log.LogInfo("Run only when named with --suite, or their tests with --test: "
+                RunLog.Info(RunLog.Tags(left), "Run only when named with --suite, or their tests with --test: "
                     + string.Join(", ", namedOnly) + ".");
             }
         }
