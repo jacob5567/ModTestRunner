@@ -5,11 +5,12 @@ using RoR2;
 
 namespace ModTestRunner
 {
-    // mod_test: picks scenarios by mod, suite and test, then lists or runs them. Every flag can be given more than once.
+    // mod_test: picks scenarios by mod, suite and test, then lists or runs them. Every flag takes a comma-separated list
+    // of names and can be given more than once.
     internal static class TestCommand
     {
-        public const string HelpText = "Runs registered in-game mod tests. mod_test [list] [--mod <mod>] [--suite <suite>] "
-            + "[--test <test>]. "
+        public const string HelpText = "Runs registered in-game mod tests. mod_test [list] [--mod <mods>] [--suite <suites>] "
+            + "[--test <tests>], each a comma-separated list. "
             + "mod_test help for more.";
 
         private static readonly string[] Usage =
@@ -21,6 +22,7 @@ namespace ModTestRunner
             "mod_test --mod <mod> --suite <s>  runs that mod's suite",
             "mod_test --test <test>            runs one scenario (-t); write <mod>.<test> when two mods have a test of that name",
             "mod_test list [...]               lists what the same flags would run, instead of running it",
+            "Each flag takes a comma-separated list, as in --suite pickers,screenshots, and runs what any of the names pick.",
             "Every scenario runs in a plain mod_test, except those only in suites marked to run only when named with --suite "
                 + "(or a test with --test).",
         };
@@ -49,13 +51,19 @@ namespace ModTestRunner
                     case "-s":
                     case "--test":
                     case "-t":
-                        if (i + 1 >= args.Count)
+                        List<string> names = flag == "--mod" || flag == "-m" ? mods : flag == "--suite" || flag == "-s" ? suites : tests;
+                        int before = names.Count;
+                        // The game's console lexer drops commas between tokens, so "a,b" arrives as two arguments:
+                        // take every name up to the next flag. A quoted "a,b" arrives whole, so split it too.
+                        while (i + 1 < args.Count && !IsKeyword(args[i + 1]))
+                        {
+                            names.AddRange(args[++i].Split(',').Select(name => name.Trim()).Where(name => name.Length > 0));
+                        }
+                        if (names.Count == before)
                         {
                             ModTestRunnerPlugin.Log.LogWarning($"{arg} needs a name. See mod_test help.");
                             return;
                         }
-                        List<string> names = flag == "--mod" || flag == "-m" ? mods : flag == "--suite" || flag == "-s" ? suites : tests;
-                        names.Add(args[++i]);
                         break;
                     default:
                         ModTestRunnerPlugin.Log.LogWarning($"Unknown argument '{arg}'. See mod_test help.");
@@ -165,6 +173,12 @@ namespace ModTestRunner
                 named.UnionWith(matched);
             }
             return candidates.Where(named.Contains).ToList();
+        }
+
+        // A flag or a word like list, which ends the names after a flag.
+        private static bool IsKeyword(string arg)
+        {
+            return arg.StartsWith("-") || Same(arg, "list") || Same(arg, "help");
         }
 
         private static bool Same(string a, string b)

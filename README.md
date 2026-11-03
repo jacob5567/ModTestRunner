@@ -34,8 +34,9 @@ with the first suite that holds it. Each suite starts clean: its first stage loa
 into the survivor they were when the run began, and the stage count goes back to the first stage's. Scenarios in no
 suite run after the suites, and ones marked `runsLast` after everything. `mod_test list` shows that order. Screenshots go to `BepInEx/ModTestRunner/Screenshots/<run start>/`, and the summary says where.
 
-`--mod`, `--suite` and `--test` can each be given more than once, and together they narrow each other: `--test` picks
-among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
+`--mod`, `--suite` and `--test` each take a comma-separated list, as in `mod_test --mod SevenUI --suite
+pickers,screenshots`, and pick what any of the names pick. Giving a flag more than once adds to its list. Together the
+flags narrow each other: `--test` picks among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
 
 Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures for each mod, and a total when the run had several. Every line the runner writes about a mod's tests starts with `[<mod>.Tests]`, so `grep '\[YourMod.Tests\]'` finds a mod's whole run; a scenario's own lines can be written the same way with `h.Log(...)`.
 
