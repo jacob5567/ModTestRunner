@@ -256,6 +256,14 @@ namespace ModTestRunner
             {
                 run.NetworkstageClearCount = 0;
                 run.NetworkstageClearCountAtLoopStart = 0;
+                // The stage's monster pool was built at the old count, and its cards that need more cleared stages are now
+                // unavailable: a combat director that draws one is left without a card and throws on every spawn attempt.
+                // The rebuild is seeded from the stage's seed, so it takes no run RNG and picks the same category.
+                ClassicStageInfo stageInfo = ClassicStageInfo.instance;
+                if (stageInfo)
+                {
+                    stageInfo.RebuildCards();
+                }
             }
         }
 
