@@ -17,5 +17,6 @@ namespace ModTestRunner
         public const string SpawnAi = "spawn_ai";
         public const string SpawnBody = "spawn_body";
         public const string ChargeZone = "charge_zone";
+        public const string PreventProfileWriting = "prevent_profile_writing";
     }
 }

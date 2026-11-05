@@ -81,6 +81,8 @@ namespace ModTestRunner
         private bool startGodMode;
         // The scenario in progress, whose mod readies stages, cleans up and explains failures.
         private Scenario scenario;
+        // Prevents profile writing for the run, so the tests' stats and unlocks don't reach the player's profile.
+        private readonly ProfileWriting profileWriting = new ProfileWriting();
 
         public static CharacterBody LocalBody
         {
@@ -132,9 +134,11 @@ namespace ModTestRunner
             CharacterBody body = LocalBody;
             startBody = body ? body.bodyIndex : BodyIndex.None;
             startGodMode = body && body.healthComponent && body.healthComponent.godMode;
+            string allTags = string.Join(" ", tallies.Keys.Select(RunLog.Tag));
 
             try
             {
+                RunLog.Info(allTags, profileWriting.Prevent(this));
                 foreach (RunPart part in parts)
                 {
                     RunLog.Info(RunLog.Tags(part.Scenarios), $"Suite {part.Name}: {part.Scenarios.Count} scenarios.");
@@ -218,15 +222,27 @@ namespace ModTestRunner
                 }
                 if (tallies.Count > 1)
                 {
-                    string tags = string.Join(" ", tallies.Keys.Select(RunLog.Tag));
                     string total = $"Mod tests: {tallies.Values.Sum(t => t.Passed)} passed, " +
                                    $"{tallies.Values.Sum(t => t.Failures.Count)} failed, {tallies.Values.Sum(t => t.Skipped)} skipped.";
-                    RunLog.Info(tags, total);
-                    Debug.Log($"{tags} {total}");
+                    RunLog.Info(allTags, total);
+                    Debug.Log($"{allTags} {total}");
                 }
             }
             finally
             {
+                // In a try of its own, so a failure here can't skip the rest of the run's ending.
+                try
+                {
+                    string restored = profileWriting.Restore(this);
+                    if (restored != null)
+                    {
+                        RunLog.Info(allTags, restored);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    RunLog.Error(allTags, $"Couldn't allow profile writing again; run '{Commands.PreventProfileWriting} 0'. {exception.Message}");
+                }
                 godMode = startGodMode;
                 KeepGodMode();
                 running = false;

@@ -38,6 +38,12 @@ suite run after the suites, and ones marked `runsLast` after everything. `mod_te
 pickers,screenshots`, and pick what any of the names pick. Giving a flag more than once adds to its list. Together the
 flags narrow each other: `--test` picks among the scenarios `--mod` and `--suite` pick. Names aren't case-sensitive.
 
+While the tests run, the runner turns on DebugToolkit's `prevent_profile_writing`, so the stats, unlocks and
+achievements the scenarios earn aren't written to disk. It turns it off again when the run ends, failed or not, unless
+it was already on before the run. The changes are still in the profile in memory, so the game's next save writes them,
+at the latest when the game closes. To keep them out of your main profile, leave `prevent_profile_writing 1` on until
+you close the game, or test on a separate profile.
+
 Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures for each mod, and a total when the run had several. Every line the runner writes about a mod's tests starts with `[<mod>.Tests]`, so `grep '\[YourMod.Tests\]'` finds a mod's whole run; a scenario's own lines can be written the same way with `h.Log(...)`.
 
 ## Writing tests for a mod
