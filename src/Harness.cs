@@ -203,6 +203,18 @@ namespace ModTestRunner
                     }
                 }
 
+                // Each mod's own ending, once, after the last scenario.
+                foreach (ModTests mod in tallies.Keys)
+                {
+                    error = null;
+                    yield return Drive(mod.Finish(this));
+                    if (error != null)
+                    {
+                        RunLog.Warning(RunLog.Tag(mod), $"Finish failed: {error.Message}");
+                    }
+                }
+                error = null;
+
                 // A summary for each mod, the game's console included, then the run's total when it had several.
                 foreach (KeyValuePair<ModTests, Tally> entry in tallies)
                 {

@@ -81,6 +81,7 @@ internal sealed class YourModTests : ModTests
     //   Precondition(scenario)  why a scenario can't run now (the mod is turned off, ...), or null
     //   Ready()                 whether the mod has attached after a stage loads; stage loads wait for it
     //   Cleanup(h)              puts back what your scenarios change, after the runner's own cleanup
+    //   Finish(h)               puts back what you set up for the whole run, once, after the last scenario
     //   Diagnose()              what your mod saw, added to every failure message
 
     private static IEnumerator ShowsOnLunar(Harness h)
@@ -147,7 +148,8 @@ triggers a scenario needs unearned.
 | Cleanup | `SetConfig` (changes a config entry for one scenario), `OnCleanup` (any other restore step) |
 
 After every scenario, the runner destroys what `Spawned`, `SpawnPrefab` and `SpawnPickup` made. It then undoes the
-`SetConfig` and `OnCleanup` changes, clears the inventory, kills all monsters, and runs your `Cleanup`.
+`SetConfig` and `OnCleanup` changes, clears the inventory, kills all monsters, and runs your `Cleanup`. After the last
+scenario of a run, it runs each mod's `Finish` once, before the summaries.
 
 ## Building
 

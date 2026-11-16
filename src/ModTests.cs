@@ -43,6 +43,13 @@ namespace ModTestRunner
             yield break;
         }
 
+        // Runs once at the end of a run that included any of the mod's scenarios, after the last one's cleanup. Puts back
+        // what the mod set up for the whole run, such as config changed before its first scenario.
+        public virtual IEnumerator Finish(Harness h)
+        {
+            yield break;
+        }
+
         // What the mod saw when a check failed, for the failure message, or null.
         public virtual string Diagnose()
         {
