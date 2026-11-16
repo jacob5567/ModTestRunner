@@ -6,8 +6,11 @@
 #   ./run-tests.sh --mod SevenUI
 #   ./run-tests.sh --timeout 1800 --mod KarmaWarnings --suite basics
 #   ./run-tests.sh --resolution 1920x1080 --mod SevenUI
+#   ./run-tests.sh --visible --mod SevenUI --suite font
 #
-# --timeout <seconds> (default 900) and --resolution <width>x<height> (default 2560x1440) come first, in either order.
+# --timeout <seconds> (default 900), --resolution <width>x<height> (default 2560x1440) and --visible come first, in any
+# order. With steam-launch.sh in the game's Steam launch options, the game runs in a headless gamescope, unseen and
+# whether or not a monitor is on; --visible runs it in a normal window instead, to watch.
 #
 # Exit status: 0 all passed, 1 some failed, 2 the run didn't finish (error, timeout, crash, or the game already running).
 # Environment: R2_PROFILE (r2modman profile name, default Default), STEAM (path to steam.sh).
@@ -37,13 +40,15 @@ quit_grace=60
 poll=2
 
 resolution=2560x1440
-while [ $# -ge 2 ]; do
+visible=false
+while [ $# -ge 1 ]; do
     case "$1" in
-        --timeout) timeout=$2 ;;
-        --resolution) resolution=$2 ;;
+        --timeout) timeout=$2; shift ;;
+        --resolution) resolution=$2; shift ;;
+        --visible) visible=true ;;
         *) break ;;
     esac
-    shift 2
+    shift
 done
 test_args="$*"
 
@@ -57,10 +62,18 @@ if game_running; then
     echo "The game is already running; close it first." >&2
     exit 2
 fi
-# With no monitor connected (one that is off or asleep reports disconnected), the game starts at a 1024x768 fallback
-# and can't change size, so layout checks can't pass.
-if ! grep -qx connected /sys/class/drm/card*-*/status 2>/dev/null; then
-    echo "No monitor is connected (or it's off or asleep): the game can't run at $resolution. Wake the monitor first." >&2
+# Headless when the game's Steam launch options go through steam-launch.sh (which needs gamescope).
+headless=false
+if ! $visible && command -v gamescope > /dev/null &&
+    grep -A40 '"632360"' "$HOME"/.local/share/Steam/userdata/*/config/localconfig.vdf 2>/dev/null |
+        grep '"LaunchOptions"' | grep -q 'steam-launch.sh'; then
+    headless=true
+fi
+# Otherwise the game needs a monitor: with none connected (one that is off or asleep reports disconnected), it starts
+# at a 1024x768 fallback and can't change size, so layout checks can't pass.
+if ! $headless && ! grep -qx connected /sys/class/drm/card*-*/status 2>/dev/null; then
+    echo "No monitor is connected (or it's off or asleep): the game can't run at $resolution. Wake the monitor, or" \
+         "put steam-launch.sh in the game's Steam launch options to run headless (see the README)." >&2
     exit 2
 fi
 if ! pgrep -x steam > /dev/null; then
@@ -80,7 +93,7 @@ restore_resolution() {
         fi
     done
 }
-echo "Launching the game: mod_test ${test_args:-(everything)} (at $resolution, timeout ${timeout}s)"
+echo "Launching the game: mod_test ${test_args:-(everything)} (at $resolution, $($headless && echo headless || echo in a window), timeout ${timeout}s)"
 # The same launch as r2modman's, plus the automated run's arguments, each one argument with its value after "=".
 # steam.sh hands the launch to a running Steam and exits, or runs Steam itself, so it goes in the background.
 "$steam" -applaunch "$app_id" \
@@ -89,6 +102,7 @@ echo "Launching the game: mod_test ${test_args:-(everything)} (at $resolution, t
     --r2profile "$profile_name" \
     "--mod-test-timeout=$timeout" \
     "--mod-test-resolution=$resolution" \
+    $($visible && echo --mod-test-visible) \
     "--mod-test=$test_args" > /dev/null 2>&1 &
 disown
 

@@ -57,6 +57,7 @@ arguments, writes `BepInEx/ModTestRunner/results.json` and quits the game. The s
 ./run-tests.sh --mod SevenUI --suite font
 ./run-tests.sh --timeout 1800                # every mod, with a longer limit
 ./run-tests.sh --resolution 1920x1080 --mod SevenUI
+./run-tests.sh --visible --mod SevenUI --suite font   # in a normal window, to watch
 ```
 
 - Exit status: 0 when everything passed, 1 when a scenario failed, 2 when the run didn't finish: `mod_test` refused
@@ -73,8 +74,18 @@ arguments, writes `BepInEx/ModTestRunner/results.json` and quits the game. The s
   as when the game is started by hand.
 - The run turns cheats on, which turns off stats, achievements and unlocks until the game closes, and leaves
   `prevent_profile_writing` on until the game quits, so an automated run never writes to the player's profile.
-- The game opens in a window and keeps running without focus (only its sound stops), so you can work meanwhile, but
-  not play: the game can only run once.
+- Headless: with `steam-launch.sh` in front of `%command%` in the game's Steam launch options, an automated run goes
+  inside a headless [gamescope](https://github.com/ValveSoftware/gamescope) with a virtual screen of the test size.
+  Nothing appears on screen, and it works with the monitor off or asleep. Other launches go through it unchanged.
+  Set it while Steam is closed (Steam reads launch options at startup), or in the game's Properties in Steam:
+
+  ```
+  /path/to/ModTestRunner/steam-launch.sh %command% --doorstop-enabled true --doorstop-target-assembly "..." --r2profile "Default"
+  ```
+
+  `--visible` skips gamescope for one run. Without the wrapper, the game opens in a normal window and needs a monitor:
+  with none connected (one that is off or asleep counts) it can't leave a 1024x768 fallback, and the script refuses to
+  start. Either way you can work meanwhile, but not play: the game can only run once.
 - Results are `Status` (`passed`, `failed`, `aborted`, `error` or `timed out`), `Message` (why, for the last three)
   and, for each mod, `Passed`, `Failed`, `Skipped` and `Failures`. The BepInEx log has the whole run as usual.
 
