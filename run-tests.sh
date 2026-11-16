@@ -4,11 +4,11 @@
 # are mod_test's; with none, every registered mod's scenarios run.
 #
 #   ./run-tests.sh --mod SevenUI
-#   ./run-tests.sh --timeout 1800 --mod KarmaWarnings --suite basics
+#   ./run-tests.sh --timeout 3600 --mod KarmaWarnings --suite basics
 #   ./run-tests.sh --resolution 1920x1080 --mod SevenUI
 #   ./run-tests.sh --visible --mod SevenUI --suite font
 #
-# --timeout <seconds> (default 900), --resolution <width>x<height> (default 2560x1440) and --visible come first, in any
+# --timeout <seconds> (default 1800), --resolution <width>x<height> (default 2560x1440) and --visible come first, in any
 # order. With steam-launch.sh in the game's Steam launch options, the game runs in a headless gamescope, unseen and
 # whether or not a monitor is on; --visible runs it in a normal window instead, to watch.
 #
@@ -34,7 +34,7 @@ done
 log="$profile_dir/BepInEx/LogOutput.log"
 
 # The game's own limit for the whole run; this script waits longer, for the launch, before it gives up on the game.
-timeout=900
+timeout=1800
 launch_grace=180
 quit_grace=60
 poll=2

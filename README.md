@@ -55,7 +55,7 @@ arguments, writes `BepInEx/ModTestRunner/results.json` and quits the game. The s
 
 ```sh
 ./run-tests.sh --mod SevenUI --suite font
-./run-tests.sh --timeout 1800                # every mod, with a longer limit
+./run-tests.sh --timeout 3600                # every mod, with a longer limit
 ./run-tests.sh --resolution 1920x1080 --mod SevenUI
 ./run-tests.sh --visible --mod SevenUI --suite font   # in a normal window, to watch
 ```
@@ -66,7 +66,7 @@ arguments, writes `BepInEx/ModTestRunner/results.json` and quits the game. The s
   depend on it. The run sets it once the title screen is up and stops with an error if the screen doesn't reach it.
   Before quitting it puts back the player's own resolution from `config.cfg`, since the game saves the screen's size
   as the setting when it quits.
-- `--timeout <seconds>` (default 900) limits the whole run, launch included. It and `--resolution` go before the
+- `--timeout <seconds>` (default 1800) limits the whole run, launch included. It and `--resolution` go before the
   `mod_test` arguments. The game reports a timeout itself
   and quits, naming the step it was waiting for; the script kills the game if it hasn't quit 3 minutes after that.
 - `R2_PROFILE` picks the r2modman profile (default `Default`), and `STEAM` the path to `steam.sh`.

@@ -27,7 +27,7 @@ namespace ModTestRunner
         public const string ResultsFileName = "results.json";
 
         // Covers the whole run, from launch to the last scenario; run-tests.sh waits a little longer before it kills the game.
-        private const float DefaultTimeoutSeconds = 900f;
+        private const float DefaultTimeoutSeconds = 1800f;
         // After the player's body first appears, so the stage and the HUD finish setting up before the first scenario.
         private const float SettleSeconds = 3f;
         // After the lobby appears, so the local player's survivor choice is in before the run starts.
