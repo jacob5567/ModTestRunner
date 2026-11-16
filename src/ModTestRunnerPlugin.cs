@@ -28,6 +28,7 @@ namespace ModTestRunner
             Log = Logger;
             Instance = this;
             Logger.LogInfo("ModTestRunner loaded. Start a run, then use mod_test, or mod_test help.");
+            AutoRun.StartIfRequested(this);
         }
 
         private void OnDestroy()

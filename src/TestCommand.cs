@@ -29,6 +29,17 @@ namespace ModTestRunner
 
         public static void Run(ConCommandArgs args)
         {
+            List<string> words = new List<string>();
+            for (int i = 0; i < args.Count; i++)
+            {
+                words.Add(args[i]);
+            }
+            Run(words);
+        }
+
+        // The command's arguments as the console splits them, so the automated run can pass its own.
+        public static void Run(IList<string> args)
+        {
             bool list = false;
             List<string> mods = new List<string>();
             List<string> suites = new List<string>();

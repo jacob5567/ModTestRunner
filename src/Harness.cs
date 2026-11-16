@@ -65,6 +65,11 @@ namespace ModTestRunner
 
         private static bool running;
 
+        internal static bool IsRunning => running;
+
+        // Raised when a run ends, whether it finished or stopped early, with each mod's results.
+        internal static event Action<RunResults> Finished;
+
         private readonly List<GameObject> spawned = new List<GameObject>();
         // What the scenario asked to have put back, run in reverse order by Cleanup.
         private readonly List<Action> cleanups = new List<Action>();
@@ -135,6 +140,7 @@ namespace ModTestRunner
             startBody = body ? body.bodyIndex : BodyIndex.None;
             startGodMode = body && body.healthComponent && body.healthComponent.godMode;
             string allTags = string.Join(" ", tallies.Keys.Select(RunLog.Tag));
+            bool completed = false;
 
             try
             {
@@ -239,6 +245,7 @@ namespace ModTestRunner
                     RunLog.Info(allTags, total);
                     Debug.Log($"{allTags} {total}");
                 }
+                completed = true;
             }
             finally
             {
@@ -258,7 +265,35 @@ namespace ModTestRunner
                 godMode = startGodMode;
                 KeepGodMode();
                 running = false;
+                try
+                {
+                    Finished?.Invoke(Results(completed));
+                }
+                catch (Exception exception)
+                {
+                    RunLog.Error(allTags, $"A handler for the end of the run failed: {exception}");
+                }
             }
+        }
+
+        private RunResults Results(bool completed)
+        {
+            RunResults results = new RunResults();
+            foreach (KeyValuePair<ModTests, Tally> entry in tallies)
+            {
+                results.Mods.Add(new RunResults.ModResult
+                {
+                    Name = entry.Key.Name,
+                    Passed = entry.Value.Passed,
+                    Failed = entry.Value.Failures.Count,
+                    Skipped = entry.Value.Skipped,
+                    Failures = new List<string>(entry.Value.Failures),
+                });
+            }
+            results.Status = !completed ? RunResults.StatusAborted
+                : results.Mods.Any(mod => mod.Failed > 0) ? RunResults.StatusFailed
+                : RunResults.StatusPassed;
+            return results;
         }
 
         // A clean start for a suite, on its first stage: the stage count back to the first stage's, and the player back as

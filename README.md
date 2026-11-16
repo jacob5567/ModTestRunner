@@ -46,6 +46,42 @@ you close the game, or test on a separate profile.
 
 Results go to the BepInEx log (`BepInEx/LogOutput.log`), followed by a summary line and the list of failures for each mod, and a total when the run had several. Every line the runner writes about a mod's tests starts with `[<mod>.Tests]`, so `grep '\[YourMod.Tests\]'` finds a mod's whole run; a scenario's own lines can be written the same way with `h.Log(...)`.
 
+### Automated runs
+
+`run-tests.sh` runs the tests with no one at the keyboard, for scripts and coding agents. It launches the game through
+Steam with the r2modman profile, as r2modman does, and the runner takes it from there: it waits for the title screen,
+hosts a single-player lobby (`host 0`), starts the run (`pregame_start_run`), runs `mod_test` with the script's
+arguments, writes `BepInEx/ModTestRunner/results.json` and quits the game. The script then prints the results.
+
+```sh
+./run-tests.sh --mod SevenUI --suite font
+./run-tests.sh --timeout 1800                # every mod, with a longer limit
+./run-tests.sh --resolution 1920x1080 --mod SevenUI
+```
+
+- Exit status: 0 when everything passed, 1 when a scenario failed, 2 when the run didn't finish: `mod_test` refused
+  its arguments, the time ran out, the game crashed or closed early, or the game was already running.
+- `--resolution <width>x<height>` (default 2560x1440) sets the screen size the tests run at, since layout checks
+  depend on it. The run sets it once the title screen is up and stops with an error if the screen doesn't reach it.
+  Before quitting it puts back the player's own resolution from `config.cfg`, since the game saves the screen's size
+  as the setting when it quits.
+- `--timeout <seconds>` (default 900) limits the whole run, launch included. It and `--resolution` go before the
+  `mod_test` arguments. The game reports a timeout itself
+  and quits, naming the step it was waiting for; the script kills the game if it hasn't quit 3 minutes after that.
+- `R2_PROFILE` picks the r2modman profile (default `Default`), and `STEAM` the path to `steam.sh`.
+- Steam has to be running and signed in. The profile that signs in is the one in `config.cfg`'s `user_profile_main`,
+  as when the game is started by hand.
+- The run turns cheats on, which turns off stats, achievements and unlocks until the game closes, and leaves
+  `prevent_profile_writing` on until the game quits, so an automated run never writes to the player's profile.
+- The game opens in a window and keeps running without focus (only its sound stops), so you can work meanwhile, but
+  not play: the game can only run once.
+- Results are `Status` (`passed`, `failed`, `aborted`, `error` or `timed out`), `Message` (why, for the last three)
+  and, for each mod, `Passed`, `Failed`, `Skipped` and `Failures`. The BepInEx log has the whole run as usual.
+
+The game can also be launched by hand with `--mod-test=<mod_test arguments>` (and `--mod-test-timeout=<seconds>`,
+`--mod-test-resolution=<width>x<height>`),
+which does the same. Without them the runner behaves as usual.
+
 ## Writing tests for a mod
 
 For a complete example, see [KarmaWarnings' tests](https://github.com/jacob5567/KarmaWarnings/tree/main/tests).
